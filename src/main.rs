@@ -1,12 +1,10 @@
 use display_interface_spi::SPIInterface;
 use embedded_graphics::prelude::*;
-use embedded_graphics::primitives::{PrimitiveStyle, StyledDrawable, Triangle};
 use embedded_graphics::{geometry::Point, Drawable};
 use esp_idf_hal::delay::Delay;
 use esp_idf_hal::gpio::PinDriver;
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_hal::spi::*;
-use weact_studio_epd::graphics::Display;
 use weact_studio_epd::{graphics::Display290BlackWhite, Color};
 use weact_studio_epd::{graphics::DisplayRotation, WeActStudio290BlackWhiteDriver};
 
@@ -52,7 +50,7 @@ fn main() {
 
     // --- Build info from vergen + git short emitted by build.rs ---
     let build_date = option_env!("GIT_SHORT").unwrap_or("unknown");
-    let build_info = format!("commit: {}", build_date);
+    let build_info = format!("commit: {build_date}");
     add_footer_info(&mut display, &build_info);
 
     driver.full_update(&display).unwrap();
