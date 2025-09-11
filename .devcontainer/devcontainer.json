@@ -9,13 +9,16 @@
       "extensions": [
         "rust-lang.rust-analyzer",
         "tamasfe.even-better-toml",
-        "espressif.esp-idf-extension",
-        "github.copilot"
+        "espressif.esp-idf-web",
+        "github.copilot",
+        "github.copilot-chat",
+        "isudox.vscode-jetbrains-keybindings"
       ],
       "settings": {
         "rust-analyzer.cargo.target": "xtensa-esp32s3-espidf",
-        "rust-analyzer.checkOnSave.command": "clippy",
-        "editor.formatOnSave": true
+        "rust-analyzer.checkOnSave": true,
+        "editor.formatOnSave": true,
+        "idf.buildPath": "${workspaceFolder}/build",
       }
     }
   },
