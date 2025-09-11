@@ -1,0 +1,24 @@
+{
+  "name": "ESP32-S3 Rust Codespace",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "espressif.esp-idf-extension",
+        "github.copilot"
+      ],
+      "settings": {
+        "rust-analyzer.cargo.target": "xtensa-esp32s3-espidf",
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "editor.formatOnSave": true
+      }
+    }
+  },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true
+}

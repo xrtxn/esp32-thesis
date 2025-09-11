@@ -1,0 +1,5 @@
+# /home/vscode/.bash_esp_init
+# Forrásolja az alap bashrc-t, majd az ESP scriptet
+[ -f /etc/bash.bashrc ] && . /etc/bash.bashrc
+[ -f ~/.bashrc ] && . ~/.bashrc
+. /home/vscode/export-esp.sh
