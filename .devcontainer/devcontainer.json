@@ -1,7 +1,13 @@
 {
   "name": "ESP32-S3 Rust Codespace",
+  "dockerFile": "Dockerfile",
   "build": {
-    "dockerfile": "Dockerfile",
+    "secrets": {
+      "github_token": "${localEnv:PUBLIC_GITHUB_TOKEN}"
+    },
+    "args": {
+      "GITHUB_TOKEN": "${localEnv:PUBLIC_GITHUB_TOKEN}"
+    },
     "context": ".."
   },
   "customizations": {
@@ -18,7 +24,7 @@
         "rust-analyzer.cargo.target": "xtensa-esp32s3-espidf",
         "rust-analyzer.checkOnSave": true,
         "editor.formatOnSave": true,
-        "idf.buildPath": "${workspaceFolder}/build",
+        "idf.buildPath": "${workspaceFolder}/build"
       }
     }
   },

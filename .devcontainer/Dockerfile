@@ -26,5 +26,11 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
  && cargo +stable install cargo-espflash \
  && cargo +stable install cargo-espmonitor \
  && cargo +stable install ldproxy \
- && cargo +stable install espup --locked \
- && espup install
+ && cargo +stable install espup --locked
+
+RUN --mount=type=secret,id=github_token \
+    if [ -f /run/secrets/github_token ]; then \
+        export GITHUB_TOKEN="$(cat /run/secrets/github_token)"; \
+    fi && \
+    espup install
+    
