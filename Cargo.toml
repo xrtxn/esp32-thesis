@@ -51,3 +51,4 @@ embedded-graphics = "0.8.1"
 
 [build-dependencies]
 embuild = "0.33"
+vergen = { version = "9", features = ["build"] }

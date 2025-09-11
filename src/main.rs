@@ -6,6 +6,7 @@ use esp_idf_hal::delay::Delay;
 use esp_idf_hal::gpio::PinDriver;
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_hal::spi::*;
+use weact_studio_epd::graphics::Display;
 use weact_studio_epd::{graphics::Display290BlackWhite, Color};
 use weact_studio_epd::{graphics::DisplayRotation, WeActStudio290BlackWhiteDriver};
 
@@ -49,24 +50,28 @@ fn main() {
     display.set_rotation(DisplayRotation::Rotate90);
     driver.init().unwrap();
 
-    let style = PrimitiveStyle::with_stroke(Color::Black, 2);
-    display
-        .bounding_box()
-        .draw_styled(&style, &mut display)
-        .unwrap();
-
-    let mut starting_point = 32;
-    while starting_point + 16 < display.bounding_box().bottom_right().unwrap().x {
-        Triangle::new(
-            Point::new(starting_point, 16),
-            Point::new(starting_point - 16, 48),
-            Point::new(starting_point + 16, 48),
-        )
-        .into_styled(PrimitiveStyle::with_stroke(Color::Black, 1))
-        .draw(&mut display)
-        .unwrap();
-        starting_point = starting_point + 32;
-    }
+    // --- Build info from vergen + git short emitted by build.rs ---
+    let build_date = option_env!("GIT_SHORT").unwrap_or("unknown");
+    let build_info = format!("commit: {}", build_date);
+    add_footer_info(&mut display, &build_info);
 
     driver.full_update(&display).unwrap();
+}
+
+fn add_footer_info(display: &mut Display290BlackWhite, build_info: &str) {
+    use embedded_graphics::mono_font::MonoTextStyle;
+    use embedded_graphics::text::{Baseline, Text};
+
+    let font = profont::PROFONT_7_POINT;
+    let text_style = MonoTextStyle::new(&font, Color::Black);
+
+    let br = display.bounding_box().bottom_right().unwrap();
+
+    let text_width = build_info.chars().count() as i32 * font.character_size.width as i32;
+    let pos = Point::new(br.x - text_width, br.y - font.character_size.height as i32);
+
+    // Draw the build info (adjust coordinates as needed)
+    Text::with_baseline(build_info, pos, text_style, Baseline::Top)
+        .draw(display)
+        .unwrap();
 }
