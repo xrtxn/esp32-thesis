@@ -21,8 +21,24 @@ fn main() {
         })
         .unwrap_or_else(|| "unknown".to_string());
 
-    // Export as compile-time env var accessible via `env!("GIT_SHORT")` or `option_env!("GIT_SHORT")`
+    // Check if there are uncommitted changes (dirty working tree)
+    let git_dirty = Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .ok()
+        .map(|o| {
+            if o.status.success() {
+                !o.stdout.is_empty()
+            } else {
+                false
+            }
+        })
+        .unwrap_or(false);
+
+    // Export as compile-time env vars accessible via `env!("GIT_SHORT")` or `option_env!("GIT_SHORT")`
     println!("cargo:rustc-env=GIT_SHORT={git_short}");
+    println!("cargo:rustc-env=GIT_DIRTY={git_dirty}");
+
     // Keep using vergen to emit build timestamp (and any other vergen instructions)
     let instructions = BuildBuilder::default()
         .build_timestamp(true)

@@ -48,9 +48,12 @@ fn main() {
     display.set_rotation(DisplayRotation::Rotate90);
     driver.init().unwrap();
 
-    // --- Build info from vergen + git short emitted by build.rs ---
     let build_date = option_env!("GIT_SHORT").unwrap_or("unknown");
-    let build_info = format!("commit: {build_date}");
+    let git_dirty = option_env!("GIT_DIRTY").unwrap_or("false");
+    let mut build_info = format!("commit: {build_date}");
+    if git_dirty.parse::<bool>().unwrap() {
+        build_info.push_str("*");
+    }
     add_footer_info(&mut display, &build_info);
 
     driver.full_update(&display).unwrap();
