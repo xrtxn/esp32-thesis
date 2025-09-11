@@ -1,3 +1,5 @@
 #!/bin/bash
+set -e
 
-cargo espflash save-image --chip esp32s3 $CODESPACE_VSCODE_FOLDER/out/main.bin
+cargo clean -p esp32-thesis && cargo build
+cargo espflash save-image --chip esp32s3 out/main.bin
