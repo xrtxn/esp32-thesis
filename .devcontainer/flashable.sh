@@ -1,5 +1,7 @@
 #!/bin/bash
+
 set -e
 
-cargo clean -p esp32-thesis && cargo build
-cargo espflash save-image --chip esp32s3 out/main.bin
+source .devcontainer/.bash_esp_init || echo "You are in the wrong directory"
+cargo build
+cargo espflash save-image --chip esp32s3 out/main.bin --partition-table=partitions.csv

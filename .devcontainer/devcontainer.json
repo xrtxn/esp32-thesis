@@ -21,10 +21,10 @@
         "isudox.vscode-jetbrains-keybindings"
       ],
       "settings": {
-        "rust-analyzer.cargo.target": "xtensa-esp32s3-espidf",
+        "rust-analyzer.cargo.target": "xtensa-esp32s3-none-elf",
         "rust-analyzer.checkOnSave": true,
         "editor.formatOnSave": true,
-        "idf.buildPath": "${workspaceFolder}/build"
+        "terminal.integrated.defaultProfile.linux": "bash (2)"
       }
     }
   },
