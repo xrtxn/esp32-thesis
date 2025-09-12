@@ -1,54 +1,85 @@
 [package]
-name = "esp32-thesis"
-version = "0.1.0"
-authors = ["xrtxn <mihok.martin@protonmail.com>"]
-edition = "2021"
-resolver = "2"
-rust-version = "1.77"
+edition      = "2021"
+name         = "esp32-thesis"
+rust-version = "1.86"
+version      = "0.1.0"
 
 [[bin]]
 name = "esp32-thesis"
-harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
-
-[profile.release]
-opt-level = "s"
-
-[profile.dev]
-debug = true    # Symbols are nice and they don't increase the size on Flash
-opt-level = "z"
-
-[features]
-default = []
-
-experimental = ["esp-idf-svc/experimental"]
+path = "./src/bin/main.rs"
 
 [dependencies]
-log = "0.4"
-esp-idf-svc = "0.51"
-esp-idf-hal = { version = "0.45.0" }
-weact-studio-epd = { version = "0.1.2", features = ["blocking"] }
-profont = "0.7.0"
-display-interface-spi = "0.5.0"
-embedded-graphics = "0.8.1"
+esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32s3"] }
+esp-hal = { version = "=1.0.0-rc.0", features = [
+  "esp32s3",
+  "log-04",
+  "unstable",
+] }
+log = "0.4.27"
+
+embassy-net = { version = "0.7.0", features = [
+  "dhcpv4",
+  "log",
+  "medium-ethernet",
+  "tcp",
+  "udp",
+] }
+embedded-io = "0.6.1"
+embedded-io-async = "0.6.1"
+esp-alloc = "0.8.0"
+esp-backtrace = { version = "0.17.0", features = [
+  "esp32s3",
+  "exception-handler",
+  "panic-handler",
+  "println",
+] }
+esp-println = { version = "0.15.0", features = ["esp32s3", "log-04"] }
+# for more networking protocol support see https://crates.io/crates/edge-net
+bt-hci = { version = "0.2.1", features = [] }
+critical-section = "1.2.0"
+embassy-executor = { version = "0.7.0", features = [
+  "log",
+  "task-arena-size-20480",
+] }
+embassy-time = { version = "0.4.0", features = ["log"] }
+esp-hal-embassy = { version = "0.9.0", features = ["esp32s3", "log-04"] }
+esp-wifi = { version = "0.15.0", features = [
+  "ble",
+  "builtin-scheduler",
+  "coex",
+  "esp-alloc",
+  "esp32s3",
+  "log-04",
+  "smoltcp",
+  "wifi",
+] }
+smoltcp = { version = "0.12.0", default-features = false, features = [
+  "log",
+  "medium-ethernet",
+  "multicast",
+  "proto-dhcpv4",
+  "proto-dns",
+  "proto-ipv4",
+  "socket-dns",
+  "socket-icmp",
+  "socket-raw",
+  "socket-tcp",
+  "socket-udp",
+] }
+static_cell = "2.1.1"
+trouble-host = { version = "0.1.0", features = ["gatt"] }
 
 
-# --- Optional Embassy Integration ---
-# esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
+[profile.dev]
+# Rust debug is too slow.
+# For debug builds always builds with some optimization
+opt-level = "s"
 
-# If you enable embassy-time-driver, you MUST also add one of:
-
-# a) Standalone Embassy libs ( embassy-time, embassy-sync etc) with a foreign async runtime:
-# embassy-time = { version = "0.4.0", features = ["generic-queue-8"] } # NOTE: any generic-queue variant will work
-
-# b) With embassy-executor:
-# embassy-executor = { version = "0.7", features = ["executor-thread", "arch-std"] }
-
-# NOTE: if you use embassy-time with embassy-executor you don't need the generic-queue-8 feature
-
-# --- Temporary workaround for embassy-executor < 0.8 ---
-# esp-idf-svc = { version = "0.51", features = ["embassy-time-driver", "embassy-sync"] }
-# critical-section = { version = "1.1", features = ["std"], default-features = false }
-
-[build-dependencies]
-embuild = "0.33"
-vergen = { version = "9", features = ["build"] }
+[profile.release]
+codegen-units    = 1     # LLVM can perform better optimizations using a single thread
+debug            = 2
+debug-assertions = false
+incremental      = false
+lto              = 'fat'
+opt-level        = 's'
+overflow-checks  = false
