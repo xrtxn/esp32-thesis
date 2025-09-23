@@ -6,11 +6,11 @@
     holding buffers for the duration of a data transfer."
 )]
 
+use bt_hci::controller::ExternalController;
 use esp_hal::clock::CpuClock;
 use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::timer::timg::TimerGroup;
 use esp_wifi::ble::controller::BleConnector;
-use bt_hci::controller::ExternalController;
 
 use log::info;
 
@@ -43,13 +43,10 @@ async fn main(spawner: Spawner) {
 
     let rng = esp_hal::rng::Rng::new(peripherals.RNG);
     let timer1 = TimerGroup::new(peripherals.TIMG0);
-    let wifi_init = esp_wifi::init(timer1.timer0, rng)
-        .expect("Failed to initialize WIFI/BLE controller");
+    let wifi_init =
+        esp_wifi::init(timer1.timer0, rng).expect("Failed to initialize WIFI/BLE controller");
     let (mut _wifi_controller, _interfaces) = esp_wifi::wifi::new(&wifi_init, peripherals.WIFI)
         .expect("Failed to initialize WIFI controller");
-    // find more examples https://github.com/embassy-rs/trouble/tree/main/examples/esp32
-    let transport = BleConnector::new(&wifi_init, peripherals.BT);
-    let _ble_controller = ExternalController::<_, 20>::new(transport);
 
     let _ = spawner;
 
