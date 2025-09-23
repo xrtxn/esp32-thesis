@@ -1,36 +1,59 @@
-# Base devcontainer
-FROM mcr.microsoft.com/devcontainers/base:ubuntu-22.04
+# Base image
+ARG VARIANT=bookworm-slim
+FROM debian:${VARIANT}
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
 
-ARG DEBIAN_FRONTEND=noninteractive
+# Arguments
+ARG CONTAINER_USER=esp
+ARG CONTAINER_GROUP=esp
+ARG ESP_BOARD=all
+ARG GITHUB_TOKEN
 
-# System dependencies for esp-idf builds and Rust crates
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl git ca-certificates pkg-config libssl-dev \
-    cmake ninja-build libusb-1.0-0-dev \
-    python3 python3-pip python3-venv \
-    gperf bison flex ccache dfu-util wget xz-utils unzip git-lfs \
-    libudev-dev \
- && rm -rf /var/lib/apt/lists/*
+# Install dependencies
+RUN apt-get update \
+    && apt-get install -y git curl llvm-dev libclang-dev clang unzip \
+    libusb-1.0-0 libssl-dev libudev-dev pkg-config \
+    && apt-get clean -y && rm -rf /var/lib/apt/lists/* /tmp/library-scripts
 
-# Codespaces uses "vscode" user by default
-USER vscode
-ENV CARGO_HOME=/home/vscode/.cargo
-ENV RUSTUP_HOME=/home/vscode/.rustup
-ENV PATH=$CARGO_HOME/bin:$PATH
+# Set users
+RUN adduser --disabled-password --gecos "" ${CONTAINER_USER}
+USER ${CONTAINER_USER}
+WORKDIR /home/${CONTAINER_USER}
 
-# Install rustup + cargo for the vscode user so `cargo` is available in the container
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
- && rustup default stable \
- && rustup component add clippy rust-src rustfmt || true \
- && cargo --version \
- && cargo +stable install cargo-espflash \
- && cargo +stable install cargo-espmonitor \
- && cargo +stable install ldproxy \
- && cargo +stable install espup --locked
+# Install rustup
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- \
+    --default-toolchain none -y --profile minimal
 
-RUN --mount=type=secret,id=github_token \
-    if [ -f /run/secrets/github_token ]; then \
-        export GITHUB_TOKEN="$(cat /run/secrets/github_token)"; \
-    fi && \
-    espup install
-    
+# Update envs
+ENV PATH=${PATH}:/home/${CONTAINER_USER}/.cargo/bin
+
+# Install extra crates
+RUN ARCH=$($HOME/.cargo/bin/rustup show | grep "Default host" | sed -e 's/.* //') && \
+    curl -L "https://github.com/esp-rs/espup/releases/latest/download/espup-${ARCH}" -o "${HOME}/.cargo/bin/espup" && \
+    chmod u+x "${HOME}/.cargo/bin/espup" && \
+    curl -L "https://github.com/esp-rs/espflash/releases/latest/download/cargo-espflash-${ARCH}.zip" -o "${HOME}/.cargo/bin/cargo-espflash.zip" && \
+    unzip "${HOME}/.cargo/bin/cargo-espflash.zip" -d "${HOME}/.cargo/bin/" && \
+    rm "${HOME}/.cargo/bin/cargo-espflash.zip" && \
+    chmod u+x "${HOME}/.cargo/bin/cargo-espflash" && \
+    curl -L "https://github.com/esp-rs/espflash/releases/latest/download/espflash-${ARCH}.zip" -o "${HOME}/.cargo/bin/espflash.zip" && \
+    unzip "${HOME}/.cargo/bin/espflash.zip" -d "${HOME}/.cargo/bin/" && \
+    rm "${HOME}/.cargo/bin/espflash.zip" && \
+    chmod u+x "${HOME}/.cargo/bin/espflash" && \
+    curl -L "https://github.com/esp-rs/esp-web-flash-server/releases/latest/download/web-flash-${ARCH}.zip" -o "${HOME}/.cargo/bin/web-flash.zip" && \
+    unzip "${HOME}/.cargo/bin/web-flash.zip" -d "${HOME}/.cargo/bin/" && \
+    rm "${HOME}/.cargo/bin/web-flash.zip" && \
+    chmod u+x "${HOME}/.cargo/bin/web-flash"
+
+# Install Xtensa Rust
+RUN if [ -n "${GITHUB_TOKEN}" ]; then export GITHUB_TOKEN=${GITHUB_TOKEN}; fi  \
+    && ${HOME}/.cargo/bin/espup install\
+    --targets "${ESP_BOARD}" \
+    --log-level debug \
+    --export-file /home/${CONTAINER_USER}/export-esp.sh
+
+# Activate ESP environment
+RUN echo "source /home/${CONTAINER_USER}/export-esp.sh" >> ~/.bashrc
+
+CMD [ "/bin/bash" ]
