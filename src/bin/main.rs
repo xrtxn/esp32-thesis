@@ -6,11 +6,21 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use bt_hci::controller::ExternalController;
+use alloc::format;
+use display_interface_spi::SPIInterface;
+use embedded_graphics::prelude::{Dimensions, Point};
+use embedded_hal_bus::spi::ExclusiveDevice;
 use esp_hal::clock::CpuClock;
 use esp_hal::timer::systimer::SystemTimer;
-use esp_hal::timer::timg::TimerGroup;
-use esp_wifi::ble::controller::BleConnector;
+use esp_hal::{
+    delay::Delay,
+    gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
+    spi::{
+        master::{Config, Spi},
+        Mode,
+    },
+    time::Rate,
+};
 
 use log::info;
 
@@ -18,6 +28,8 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 
 use esp_backtrace as _;
+use weact_studio_epd::graphics::{Display290BlackWhite, DisplayRotation};
+use weact_studio_epd::{Color, WeActStudio290BlackWhiteDriver};
 
 extern crate alloc;
 
@@ -31,6 +43,7 @@ async fn main(spawner: Spawner) {
 
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    let delay = embassy_time::Delay;
 
     esp_alloc::heap_allocator!(size: 64 * 1024);
     // COEX needs more RAM - so we've added some more
@@ -41,12 +54,47 @@ async fn main(spawner: Spawner) {
 
     info!("Embassy initialized!");
 
-    let rng = esp_hal::rng::Rng::new(peripherals.RNG);
-    let timer1 = TimerGroup::new(peripherals.TIMG0);
-    let wifi_init =
-        esp_wifi::init(timer1.timer0, rng).expect("Failed to initialize WIFI/BLE controller");
-    let (mut _wifi_controller, _interfaces) = esp_wifi::wifi::new(&wifi_init, peripherals.WIFI)
-        .expect("Failed to initialize WIFI controller");
+    let sclk = peripherals.GPIO12;
+    let mosi = peripherals.GPIO11; // SDA -> MOSI
+
+    let mut spi_bus = Spi::new(
+        peripherals.SPI2,
+        Config::default()
+            .with_frequency(Rate::from_khz(100))
+            .with_mode(Mode::_0),
+    )
+    .unwrap()
+    .with_sck(sclk)
+    .with_mosi(mosi); // MOSI only; MISO unused
+
+    let dc = Output::new(peripherals.GPIO18, Level::Low, OutputConfig::default());
+    let rst = Output::new(peripherals.GPIO4, Level::High, OutputConfig::default());
+    let busy = Input::new(
+        peripherals.GPIO15,
+        InputConfig::default().with_pull(Pull::None),
+    );
+    let cs = Output::new(peripherals.GPIO10, Level::High, OutputConfig::default());
+
+    log::info!("Intializing SPI Device...");
+    let spi_device =
+        ExclusiveDevice::new(spi_bus, cs, Delay::new()).expect("SPI device initialize error");
+    let spi_interface = SPIInterface::new(spi_device, dc);
+
+    log::info!("Intializing EPD...");
+    let mut driver = WeActStudio290BlackWhiteDriver::new(spi_interface, busy, rst, Delay::new());
+    let mut display = Display290BlackWhite::new();
+    display.set_rotation(DisplayRotation::Rotate90);
+    driver.init().unwrap();
+
+    let build_date = option_env!("GIT_SHORT").unwrap_or("unknown");
+    let git_dirty = option_env!("GIT_DIRTY").unwrap_or("false");
+    let mut build_info = format!("commit: {build_date}");
+    if git_dirty.parse::<bool>().unwrap() {
+        build_info.push_str("*");
+    }
+    add_footer_info(&mut display, &build_info);
+
+    driver.full_update(&display).unwrap();
 
     let _ = spawner;
 
@@ -54,4 +102,23 @@ async fn main(spawner: Spawner) {
         info!("Hello world!");
         Timer::after(Duration::from_secs(1)).await;
     }
+}
+
+fn add_footer_info(display: &mut Display290BlackWhite, build_info: &str) {
+    use embedded_graphics::mono_font::MonoTextStyle;
+    use embedded_graphics::prelude::Drawable;
+    use embedded_graphics::text::{Baseline, Text};
+
+    let font = profont::PROFONT_7_POINT;
+    let text_style = MonoTextStyle::new(&font, Color::Black);
+
+    let br = display.bounding_box().bottom_right().unwrap();
+
+    let text_width = build_info.chars().count() as i32 * font.character_size.width as i32;
+    let pos = Point::new(br.x - text_width, br.y - font.character_size.height as i32);
+
+    // Draw the build info (adjust coordinates as needed)
+    Text::with_baseline(build_info, pos, text_style, Baseline::Top)
+        .draw(display)
+        .unwrap();
 }
