@@ -2,6 +2,12 @@ use std::process::Command;
 use vergen::{BuildBuilder, Emitter};
 
 fn main() {
+    // always add new git footer when files changed
+    println!("cargo:rerun-if-changed=src");
+    println!("cargo:rerun-if-changed=.git/HEAD");
+    println!("cargo:rerun-if-changed=.git/refs");
+    println!("cargo:rerun-if-changed=.git/index");
+
     add_git_info();
     linker_be_nice();
     // make sure linkall.x is the last linker script (otherwise might cause problems with flip-link)
