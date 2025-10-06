@@ -43,7 +43,6 @@ async fn main(spawner: Spawner) {
 
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
-    let delay = embassy_time::Delay;
 
     esp_alloc::heap_allocator!(size: 64 * 1024);
     // COEX needs more RAM - so we've added some more
@@ -57,7 +56,7 @@ async fn main(spawner: Spawner) {
     let sclk = peripherals.GPIO12;
     let mosi = peripherals.GPIO11; // SDA -> MOSI
 
-    let mut spi_bus = Spi::new(
+    let spi_bus = Spi::new(
         peripherals.SPI2,
         Config::default()
             .with_frequency(Rate::from_khz(100))
@@ -65,7 +64,7 @@ async fn main(spawner: Spawner) {
     )
     .unwrap()
     .with_sck(sclk)
-    .with_mosi(mosi); // MOSI only; MISO unused
+    .with_mosi(mosi);
 
     let dc = Output::new(peripherals.GPIO18, Level::Low, OutputConfig::default());
     let rst = Output::new(peripherals.GPIO4, Level::High, OutputConfig::default());

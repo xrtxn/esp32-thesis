@@ -1,4 +1,8 @@
+use std::process::Command;
+use vergen::{BuildBuilder, Emitter};
+
 fn main() {
+    add_git_info();
     linker_be_nice();
     // make sure linkall.x is the last linker script (otherwise might cause problems with flip-link)
     println!("cargo:rustc-link-arg=-Tlinkall.x");
@@ -49,4 +53,52 @@ fn linker_be_nice() {
         "cargo:rustc-link-arg=-Wl,--error-handling-script={}",
         std::env::current_exe().unwrap().display()
     );
+}
+
+fn add_git_info() {
+    // Try to get the short git hash (fallback to "unknown" on failure)
+    let git_short = Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                String::from_utf8(o.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| "unknown".to_string());
+
+    // Check if there are uncommitted changes (dirty working tree)
+    let git_dirty = Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .ok()
+        .map(|o| {
+            if o.status.success() {
+                !o.stdout.is_empty()
+            } else {
+                false
+            }
+        })
+        .unwrap_or(false);
+
+    // Export as compile-time env vars accessible via `env!("GIT_SHORT")` or `option_env!("GIT_SHORT")`
+    println!("cargo:rustc-env=GIT_SHORT={git_short}");
+    println!("cargo:rustc-env=GIT_DIRTY={git_dirty}");
+
+    // Keep using vergen to emit build timestamp (and any other vergen instructions)
+    let instructions = BuildBuilder::default()
+        .build_timestamp(true)
+        .build()
+        .unwrap();
+
+    Emitter::default()
+        .add_instructions(&instructions)
+        .unwrap()
+        .emit()
+        .unwrap();
 }
