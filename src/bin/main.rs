@@ -85,13 +85,7 @@ async fn main(spawner: Spawner) {
     display.set_rotation(DisplayRotation::Rotate90);
     driver.init().unwrap();
 
-    let build_date = option_env!("GIT_SHORT").unwrap_or("unknown");
-    let git_dirty = option_env!("GIT_DIRTY").unwrap_or("false");
-    let mut build_info = format!("commit: {build_date}");
-    if git_dirty.parse::<bool>().unwrap() {
-        build_info.push_str("*");
-    }
-    add_footer_info(&mut display, &build_info);
+    add_footer_info(&mut display);
 
     driver.full_update(&display).unwrap();
 
@@ -103,10 +97,17 @@ async fn main(spawner: Spawner) {
     }
 }
 
-fn add_footer_info(display: &mut Display290BlackWhite, build_info: &str) {
+fn add_footer_info(display: &mut Display290BlackWhite) {
     use embedded_graphics::mono_font::MonoTextStyle;
     use embedded_graphics::prelude::Drawable;
     use embedded_graphics::text::{Baseline, Text};
+
+    let build_date = option_env!("GIT_SHORT").unwrap_or("unknown");
+    let git_dirty = option_env!("GIT_DIRTY").unwrap_or("false");
+    let mut build_info = format!("commit: {build_date}");
+    if git_dirty.parse::<bool>().unwrap() {
+        build_info.push_str("*");
+    }
 
     let font = profont::PROFONT_7_POINT;
     let text_style = MonoTextStyle::new(&font, Color::Black);
@@ -116,8 +117,7 @@ fn add_footer_info(display: &mut Display290BlackWhite, build_info: &str) {
     let text_width = build_info.chars().count() as i32 * font.character_size.width as i32;
     let pos = Point::new(br.x - text_width, br.y - font.character_size.height as i32);
 
-    // Draw the build info (adjust coordinates as needed)
-    Text::with_baseline(build_info, pos, text_style, Baseline::Top)
+    Text::with_baseline(&build_info, pos, text_style, Baseline::Top)
         .draw(display)
         .unwrap();
 }
