@@ -68,11 +68,11 @@
               export __CARGO_TESTS_ONLY_SRC_ROOT=${esp-rs}/lib/rustlib/src/rust/library
 
               # Fetch Pico CSS if not already present
-              if [ ! -f web/static/pico.min.css ]; then
-                mkdir -p web/static
+              if [ -f "$PWD/flake.nix" ] && [ ! -f "$PWD/web/static/pico.min.css" ]; then
+                mkdir -p "$PWD/web/static"
                 ${pkgs.curl}/bin/curl -fsSL \
                   https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css \
-                  -o web/static/pico.min.css
+                  -o "$PWD/web/static/pico.min.css"
               fi
             '';
           };
