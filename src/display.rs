@@ -19,18 +19,26 @@ const EVENT_FONT: MonoFont = profont::PROFONT_10_POINT;
 const MINI_FONT: MonoFont = profont::PROFONT_7_POINT;
 const START_POS: i32 = calculate_text_width(5, EVENT_FONT) as i32;
 const CHARACTER_STYLE: MonoTextStyle<'static, EpdColor> =
-    MonoTextStyle::new(&EVENT_FONT, EpdColor::Black);
+    MonoTextStyle::new(&EVENT_FONT, get_inverse(BACKGROUND_COLOR));
 const MINI_CHARACTER_STYLE: MonoTextStyle<'static, EpdColor> =
-    MonoTextStyle::new(&MINI_FONT, EpdColor::Black);
+    MonoTextStyle::new(&MINI_FONT, get_inverse(BACKGROUND_COLOR));
+pub const BACKGROUND_COLOR: EpdColor = EpdColor::Black;
 
 const OVERWRITE_STYLE: PrimitiveStyle<EpdColor> = PrimitiveStyleBuilder::new()
-    .fill_color(EpdColor::White)
-    .stroke_color(EpdColor::Black)
+    .fill_color(BACKGROUND_COLOR)
+    .stroke_color(get_inverse(BACKGROUND_COLOR))
     .stroke_width(1)
     .build();
 
 const BORDERLESS_OVERWRITE_STYLE: PrimitiveStyle<EpdColor> =
-    PrimitiveStyle::with_fill(EpdColor::White);
+    PrimitiveStyle::with_fill(BACKGROUND_COLOR);
+
+const fn get_inverse(color: EpdColor) -> EpdColor {
+    match color {
+        EpdColor::Black => EpdColor::White,
+        EpdColor::White => EpdColor::Black,
+    }
+}
 
 const fn calculate_row_padding(start_hour: u8, end_hour: u8) -> i32 {
     assert!(
@@ -209,7 +217,10 @@ where
             );
 
         Line::new(start_pos, finish_pos)
-            .into_styled(PrimitiveStyle::with_stroke(EpdColor::Black, 1))
+            .into_styled(PrimitiveStyle::with_stroke(
+                get_inverse(BACKGROUND_COLOR),
+                1,
+            ))
             .draw(display)
             .unwrap();
         let row_padding =
@@ -249,7 +260,10 @@ where
     let end_y = y;
 
     Line::new(Point::new(x, y as i32), Point::new(end_x, end_y as i32))
-        .into_styled(PrimitiveStyle::with_stroke(EpdColor::Black, 1))
+        .into_styled(PrimitiveStyle::with_stroke(
+            get_inverse(BACKGROUND_COLOR),
+            1,
+        ))
         .draw(display)
         .unwrap();
 }
@@ -555,7 +569,7 @@ pub mod xtensa {
     pub use weact_studio_epd::graphics::Display420BlackWhite;
 
     use super::draw_event;
-    use crate::hardware;
+    use crate::{display::BACKGROUND_COLOR, hardware};
 
     pub(crate) async fn write_to_screen<DI, BSY, RST, DELAY>(
         display: &mut Display420BlackWhite,
@@ -574,6 +588,8 @@ pub mod xtensa {
         if !super::limit_to_today() {
             start_display_hour = start_display_hour.clamp(0, 24 - super::get_display_hours());
         }
+
+        display.clear(BACKGROUND_COLOR);
 
         crate::display::draw_time_row_header(display, start_display_hour);
         crate::display::draw_base_calendar(display, start_display_hour);
