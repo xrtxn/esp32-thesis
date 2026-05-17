@@ -19,26 +19,20 @@ const EVENT_FONT: MonoFont = profont::PROFONT_10_POINT;
 const MINI_FONT: MonoFont = profont::PROFONT_7_POINT;
 const START_POS: i32 = calculate_text_width(5, EVENT_FONT) as i32;
 const CHARACTER_STYLE: MonoTextStyle<'static, EpdColor> =
-    MonoTextStyle::new(&EVENT_FONT, get_inverse(BACKGROUND_COLOR));
+    MonoTextStyle::new(&EVENT_FONT, FOREGROUND_COLOR);
 const MINI_CHARACTER_STYLE: MonoTextStyle<'static, EpdColor> =
-    MonoTextStyle::new(&MINI_FONT, get_inverse(BACKGROUND_COLOR));
-pub const BACKGROUND_COLOR: EpdColor = EpdColor::Black;
+    MonoTextStyle::new(&MINI_FONT, FOREGROUND_COLOR);
+pub const BACKGROUND_COLOR: EpdColor = EpdColor::White;
+pub const FOREGROUND_COLOR: EpdColor = EpdColor::Black;
 
 const OVERWRITE_STYLE: PrimitiveStyle<EpdColor> = PrimitiveStyleBuilder::new()
     .fill_color(BACKGROUND_COLOR)
-    .stroke_color(get_inverse(BACKGROUND_COLOR))
+    .stroke_color(FOREGROUND_COLOR)
     .stroke_width(1)
     .build();
 
 const BORDERLESS_OVERWRITE_STYLE: PrimitiveStyle<EpdColor> =
     PrimitiveStyle::with_fill(BACKGROUND_COLOR);
-
-const fn get_inverse(color: EpdColor) -> EpdColor {
-    match color {
-        EpdColor::Black => EpdColor::White,
-        EpdColor::White => EpdColor::Black,
-    }
-}
 
 const fn calculate_row_padding(start_hour: u8, end_hour: u8) -> i32 {
     assert!(
@@ -217,10 +211,7 @@ where
             );
 
         Line::new(start_pos, finish_pos)
-            .into_styled(PrimitiveStyle::with_stroke(
-                get_inverse(BACKGROUND_COLOR),
-                1,
-            ))
+            .into_styled(PrimitiveStyle::with_stroke(FOREGROUND_COLOR, 1))
             .draw(display)
             .unwrap();
         let row_padding =
@@ -260,10 +251,7 @@ where
     let end_y = y;
 
     Line::new(Point::new(x, y as i32), Point::new(end_x, end_y as i32))
-        .into_styled(PrimitiveStyle::with_stroke(
-            get_inverse(BACKGROUND_COLOR),
-            1,
-        ))
+        .into_styled(PrimitiveStyle::with_stroke(FOREGROUND_COLOR, 1))
         .draw(display)
         .unwrap();
 }
