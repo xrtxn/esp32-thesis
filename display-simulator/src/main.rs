@@ -36,7 +36,7 @@ fn main() {
         .year(2026)
         .month(7)
         .day(11)
-        .hour(6)
+        .hour(22)
         .minute(32)
         .second(1)
         .subsec_nanosecond(31) // Zeroes out the fractional seconds
@@ -45,7 +45,7 @@ fn main() {
 
     let start_display_hour: u8 = now
         .hour()
-        .clamp(0, 24 - display::get_display_hours() as i8)
+        //     .clamp(0, 24 - display::get_display_hours() as i8)
         .try_into()
         .unwrap();
 
@@ -124,7 +124,7 @@ fn main() {
 
     display::draw_time_ticker(&mut display, &now, start_display_hour);
     display::draw_time_row_header(&mut display, start_display_hour);
-    display::draw_base_calendar(&mut display, start_display_hour);
+    display::draw_base_calendar(&mut display, start_display_hour, &now);
     display::draw_sync_time(&mut display, &now);
     //display::draw_days(&mut display, &now.weekday(), 3);
 

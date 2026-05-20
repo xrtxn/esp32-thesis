@@ -12,6 +12,8 @@ path = "src/main.rs"
 embedded-graphics = "0.8.1"
 profont = "0.7.0"
 jiff = { version = "0.2.22", features = ["std"] }
+icu = { version = "2.2", default-features = false, features = ["compiled_data"] }
+icu_datetime = { version = "2.2", default-features = false, features = ["compiled_data"] }
 heapless = "0.9.2"
 log = "0.4.27"
 env_logger = "0.11"

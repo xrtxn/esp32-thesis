@@ -91,6 +91,8 @@ mbedtls-rs-sys = { git = "https://github.com/esp-rs/mbedtls-rs.git", features = 
 roxmltree = { version = "0.21.1", default-features = false }
 vcal-parser = { path = "./vcal-parser" }
 jiff = { version = "0.2.22", default-features = false, features = ["alloc"] }
+icu = { version = "2.2", default-features = false, features = ["compiled_data"] }
+icu_datetime = { version = "2.2", default-features = false, features = ["compiled_data"] }
 
 # NTP
 sntpc = { version = "0.8", default-features = false }

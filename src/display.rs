@@ -24,6 +24,7 @@ const MINI_CHARACTER_STYLE: MonoTextStyle<'static, EpdColor> =
     MonoTextStyle::new(&MINI_FONT, FOREGROUND_COLOR);
 pub const BACKGROUND_COLOR: EpdColor = EpdColor::White;
 pub const FOREGROUND_COLOR: EpdColor = EpdColor::Black;
+const DRAW_NEW_DAY: bool = true;
 
 const OVERWRITE_STYLE: PrimitiveStyle<EpdColor> = PrimitiveStyleBuilder::new()
     .fill_color(BACKGROUND_COLOR)
@@ -55,7 +56,11 @@ pub fn limit_to_today() -> bool {
 }
 
 pub fn get_display_hours() -> u8 {
-    DISPLAY_HOURS.load(core::sync::atomic::Ordering::Relaxed)
+    if DRAW_NEW_DAY {
+        DISPLAY_HOURS.load(core::sync::atomic::Ordering::Relaxed) - 1
+    } else {
+        DISPLAY_HOURS.load(core::sync::atomic::Ordering::Relaxed)
+    }
 }
 
 #[cfg(debug_assertions)]
@@ -96,31 +101,47 @@ where
     etext.draw(display).unwrap();
 }
 
-pub(crate) fn draw_time_row_header<D>(display: &mut D, start_display_hour: u8)
+pub(crate) fn draw_time_row_header<D>(
+    display: &mut D,
+    start_display_hour: u8,
+) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = EpdColor> + OriginDimensions,
-    D::Error: core::fmt::Debug,
 {
+    let end_hour = start_display_hour + get_display_hours();
     let text_height = EVENT_FONT.character_size.height as i32;
-    let mut exceeded_height: i32 = 0;
+    let row_padding = calculate_row_padding(start_display_hour, end_hour);
 
-    let position = display.bounding_box().top_left;
+    let y_step = text_height + row_padding;
+    let start_pos = display.bounding_box().top_left;
 
-    for hour in start_display_hour..=start_display_hour + get_display_hours() {
-        let fmt_hour: heapless::String<5> = hformat!("{:0>2}:00", hour % 24).unwrap();
+    let mut y_offset = 0;
+    let mut drawn_day = false;
+
+    for hour in start_display_hour..=end_hour {
+        let rel_hour = hour % 24;
+
+        // Add the extra gap for the new day, but do NOT skip the loop.
+        // This pushes the 00:00 text down by one extra row.
+        if rel_hour == 0 && !drawn_day && DRAW_NEW_DAY {
+            drawn_day = true;
+            y_offset += y_step;
+        }
+
+        let fmt_hour: heapless::String<5> = hformat!("{:0>2}:00", rel_hour).unwrap();
+
         Text::with_baseline(
             &fmt_hour,
-            position + Point::new(0, exceeded_height),
+            start_pos + Point::new(0, y_offset),
             CHARACTER_STYLE,
             embedded_graphics::text::Baseline::Top,
         )
-        .draw(display)
-        .unwrap();
-        let row_padding =
-            calculate_row_padding(start_display_hour, start_display_hour + get_display_hours());
-        exceeded_height += text_height + row_padding;
+        .draw(display)?;
+
+        y_offset += y_step;
     }
-    // height is at max
+
+    Ok(())
 }
 
 /// Calculates the starting position of the event based on the screen size
@@ -191,31 +212,76 @@ where
     etext.draw(display).unwrap();
 }
 
-pub fn draw_base_calendar<D>(display: &mut D, start_display_hour: u8)
+pub fn draw_base_calendar<D>(display: &mut D, start_display_hour: u8, time: &jiff::Zoned)
 where
     D: DrawTarget<Color = EpdColor> + OriginDimensions,
     D::Error: core::fmt::Debug,
 {
+    // 00:00 + 1 is because of the left side time text
+    const HOUR_LENGTH: u8 = 5 + 1;
+
     let text_height = EVENT_FONT.character_size.height as i32;
     let text_width = EVENT_FONT.character_size.width as i32;
     let mut exceeded_height: i32 = 0;
 
     let position = display.bounding_box().top_left;
 
-    for _ in start_display_hour..=start_display_hour + get_display_hours() {
-        let start_pos = position + Point::new(text_width * 6, exceeded_height + text_height / 2);
+    let mut drawn_day = false;
+
+    let end_hour = start_display_hour + get_display_hours();
+
+    let row_padding = calculate_row_padding(start_display_hour, end_hour);
+    for hour in start_display_hour..=end_hour {
+        let rel_hour = hour % 24;
+        let start_pos = position
+            + Point::new(
+                text_width * HOUR_LENGTH as i32,
+                exceeded_height + text_height / 2,
+            );
         let finish_pos = position
             + Point::new(
                 display.size().width as i32,
                 exceeded_height + text_height / 2,
             );
 
+        if rel_hour == 0 && !drawn_day {
+            use icu::locale::locale;
+            use icu_datetime::DateTimeFormatter;
+
+            let icu_date = icu_datetime::input::Date::try_new_gregorian(
+                time.year() as i32,
+                time.month() as u8,
+                time.day() as u8,
+            )
+            .unwrap();
+
+            let locale = locale!("hu-HU");
+            let formatter =
+                DateTimeFormatter::try_new(locale.into(), icu_datetime::fieldsets::YMDE::long())
+                    .unwrap();
+
+            let str = formatter.format(&icu_date).to_string();
+
+            Text::with_baseline(
+                &str,
+                position
+                    + Point::new(
+                        text_width * HOUR_LENGTH as i32,
+                        exceeded_height + (text_height + row_padding) / 2,
+                    ),
+                CHARACTER_STYLE,
+                embedded_graphics::text::Baseline::Top,
+            )
+            .draw(display)
+            .unwrap();
+
+            drawn_day = true;
+        };
+
         Line::new(start_pos, finish_pos)
             .into_styled(PrimitiveStyle::with_stroke(FOREGROUND_COLOR, 1))
             .draw(display)
             .unwrap();
-        let row_padding =
-            calculate_row_padding(start_display_hour, start_display_hour + get_display_hours());
         exceeded_height += text_height + row_padding;
     }
     // height is at max
@@ -580,7 +646,7 @@ pub mod xtensa {
         display.clear(BACKGROUND_COLOR);
 
         crate::display::draw_time_row_header(display, start_display_hour);
-        crate::display::draw_base_calendar(display, start_display_hour);
+        crate::display::draw_base_calendar(display, start_display_hour, &time);
         let tz = jiff::tz::TimeZone::fixed(jiff::tz::offset(2));
         let mut spaces = super::OccupiedSpaces::new();
 
