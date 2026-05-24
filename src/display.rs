@@ -581,50 +581,6 @@ pub const fn extend_rectangle(rec: &mut Rectangle) {
     rec.top_left.x -= 2;
 }
 
-#[allow(dead_code)]
-pub fn draw_days<D>(display: &mut D, current_day: jiff::civil::Weekday, count: u8)
-where
-    D: DrawTarget<Color = EpdColor> + OriginDimensions,
-    D::Error: core::fmt::Debug,
-{
-    let starting_x = START_POS;
-    let y = display.bounding_box().size.height - EVENT_FONT.character_size.height;
-    let mut x_offset = 0;
-    // max 7 days supported
-    let mut days: heapless::Vec<jiff::civil::Weekday, 7> = heapless::Vec::new();
-    for i in 0..count.clamp(1, 7) {
-        days.push(current_day.wrapping_add(i as i64)).unwrap();
-    }
-    for day in days {
-        let day_text = match day {
-            jiff::civil::Weekday::Monday => "Monday",
-            jiff::civil::Weekday::Tuesday => "Tuesday",
-            jiff::civil::Weekday::Wednesday => "Wednesday",
-            jiff::civil::Weekday::Thursday => "Thursday",
-            jiff::civil::Weekday::Friday => "Friday",
-            jiff::civil::Weekday::Saturday => "Saturday",
-            jiff::civil::Weekday::Sunday => "Sunday",
-        };
-        x_offset += day_text.chars().count() as i32 * EVENT_FONT.character_size.width as i32 + 15;
-        let pos = Point::new(starting_x + x_offset, y as i32);
-        #[cfg(feature = "defmt")]
-        info!(
-            "Drawing day '{}' at position {:?}",
-            day_text,
-            crate::defmt::Debug2Format(&pos)
-        );
-
-        Text::with_baseline(
-            day_text,
-            pos,
-            CHARACTER_STYLE,
-            embedded_graphics::text::Baseline::Top,
-        )
-        .draw(display)
-        .unwrap();
-    }
-}
-
 pub(crate) fn draw_config<D>(display: &mut D, text: &str)
 where
     D: DrawTarget<Color = EpdColor> + OriginDimensions,
