@@ -1,9 +1,12 @@
 use core::range::RangeInclusive;
 
+use embedded_graphics::geometry::Size;
 use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
 use embedded_graphics::prelude::{Dimensions, DrawTarget, OriginDimensions, Point};
 use embedded_graphics::prelude::{Drawable, Primitive};
-use embedded_graphics::primitives::{Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle};
+use embedded_graphics::primitives::{
+    Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, RoundedRectangle,
+};
 use embedded_graphics::text::Text;
 use heapless::format as hformat;
 use weact_studio_epd::Color as EpdColor;
@@ -212,37 +215,65 @@ where
     etext.draw(display).unwrap();
 }
 
+pub fn fill_rectangle_with_diagonal<D>(display: &mut D, rect: Rectangle)
+where
+    D: DrawTarget<Color = EpdColor> + OriginDimensions,
+    D::Error: core::fmt::Debug,
+{
+    rect.into_styled(OVERWRITE_STYLE).draw(display).unwrap();
+
+    let mut bottom_left = Point {
+        x: rect.top_left.x,
+        y: rect.bottom_right().unwrap().y,
+    };
+
+    fn move_right(point: &mut Point) {
+        point.x += 20;
+    }
+
+    let mut top_point = rect.top_left;
+    top_point.x += rect.size.height as i32 / 2;
+    loop {
+        Line::new(bottom_left, top_point)
+            .into_styled(PrimitiveStyle::with_stroke(FOREGROUND_COLOR, 1))
+            .draw(display)
+            .unwrap();
+
+        if top_point.x >= rect.bottom_right().unwrap().x {
+            break;
+        }
+
+        move_right(&mut bottom_left);
+        move_right(&mut top_point);
+    }
+}
+
 pub fn draw_base_calendar<D>(display: &mut D, start_display_hour: u8, time: &jiff::Zoned)
 where
     D: DrawTarget<Color = EpdColor> + OriginDimensions,
     D::Error: core::fmt::Debug,
 {
-    // 00:00 + 1 is because of the left side time text
+    // `00:00` + 1 is because of the left side time text
     const HOUR_LENGTH: u8 = 5 + 1;
 
     let text_height = EVENT_FONT.character_size.height as i32;
     let text_width = EVENT_FONT.character_size.width as i32;
-    let mut exceeded_height: i32 = 0;
 
     let position = display.bounding_box().top_left;
 
     let mut drawn_day = false;
 
     let end_hour = start_display_hour + get_display_hours();
-
     let row_padding = calculate_row_padding(start_display_hour, end_hour);
+    let y_step = text_height + row_padding;
+    let mut y_offset = 0;
+
     for hour in start_display_hour..=end_hour {
         let rel_hour = hour % 24;
-        let start_pos = position
-            + Point::new(
-                text_width * HOUR_LENGTH as i32,
-                exceeded_height + text_height / 2,
-            );
-        let finish_pos = position
-            + Point::new(
-                display.size().width as i32,
-                exceeded_height + text_height / 2,
-            );
+        let start_pos =
+            position + Point::new(text_width * HOUR_LENGTH as i32, y_offset + text_height / 2);
+        let finish_pos =
+            position + Point::new(display.size().width as i32, y_offset + text_height / 2);
 
         if rel_hour == 0 && !drawn_day {
             use icu::locale::locale;
@@ -262,13 +293,17 @@ where
 
             let str = formatter.format(&icu_date).to_string();
 
+            let mut rect_start = start_pos;
+            rect_start.x = -20;
+
+            let mut rect_end = finish_pos;
+            rect_end.y += y_step;
+
+            fill_rectangle_with_diagonal(display, Rectangle::with_corners(rect_start, rect_end));
+
             Text::with_baseline(
                 &str,
-                position
-                    + Point::new(
-                        text_width * HOUR_LENGTH as i32,
-                        exceeded_height + (text_height + row_padding) / 2,
-                    ),
+                position + Point::new(text_width * HOUR_LENGTH as i32, y_offset + y_step / 2),
                 CHARACTER_STYLE,
                 embedded_graphics::text::Baseline::Top,
             )
@@ -282,7 +317,7 @@ where
             .into_styled(PrimitiveStyle::with_stroke(FOREGROUND_COLOR, 1))
             .draw(display)
             .unwrap();
-        exceeded_height += text_height + row_padding;
+        y_offset += y_step;
     }
     // height is at max
 }
@@ -385,18 +420,15 @@ pub(crate) fn draw_event<D>(
     D::Error: core::fmt::Debug,
 {
     let start_days_diff = start.date().since(*today).unwrap().get_days();
-    let start_mins_from_midnight =
-        start_days_diff * 24 * 60 + start.hour() as i32 * 60 + start.minute() as i32;
+    let start_min = start_days_diff * 24 * 60 + start.hour() as i32 * 60 + start.minute() as i32;
 
     let end_days_diff = end.date().since(*today).unwrap().get_days();
-    let end_mins_from_midnight =
-        end_days_diff * 24 * 60 + end.hour() as i32 * 60 + end.minute() as i32;
+    let mut end_min = end_days_diff * 24 * 60 + end.hour() as i32 * 60 + end.minute() as i32;
 
     let display_start_mins = start_display_hour as i32 * 60;
     let display_end_mins = (start_display_hour as i32 + get_display_hours() as i32) * 60;
 
-    if end_mins_from_midnight <= display_start_mins || start_mins_from_midnight >= display_end_mins
-    {
+    if end_min <= display_start_mins || start_min >= display_end_mins {
         #[cfg(feature = "defmt")]
         crate::defmt::warn!(
             "Event '{}' is out of display bounds ({}-{}), skipping",
@@ -408,11 +440,18 @@ pub(crate) fn draw_event<D>(
     }
 
     let y = calculate_start_height(
-        (start_mins_from_midnight - display_start_mins).max(0) as u16,
+        (start_min - display_start_mins).max(0) as u16,
         start_display_hour,
     );
+
+    let is_past_midnight = end_min >= 1440;
+
+    if DRAW_NEW_DAY == true && is_past_midnight {
+        end_min += 60;
+    }
+
     let mut end_y = calculate_end_height(
-        (end_mins_from_midnight - display_start_mins).max(0) as u16,
+        (end_min - display_start_mins).max(0) as u16,
         start_display_hour,
     )
     .clamp(
@@ -645,8 +684,8 @@ pub mod xtensa {
 
         display.clear(BACKGROUND_COLOR);
 
-        crate::display::draw_time_row_header(display, start_display_hour);
         crate::display::draw_base_calendar(display, start_display_hour, &time);
+        crate::display::draw_time_row_header(display, start_display_hour);
         let tz = jiff::tz::TimeZone::fixed(jiff::tz::offset(2));
         let mut spaces = super::OccupiedSpaces::new();
 

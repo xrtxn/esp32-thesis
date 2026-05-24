@@ -114,6 +114,11 @@ fn main() {
             "Midnight",
         ),
         sample_event(
+            "2026-07-11T23:00:00+01:00",
+            "2026-07-12T02:10:00+01:00",
+            "Past",
+        ),
+        sample_event(
             "2026-07-11T16:00:00+01:00",
             "2026-07-11T17:59:00+01:00",
             "Very very very long event name",
