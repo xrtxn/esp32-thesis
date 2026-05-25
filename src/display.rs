@@ -261,57 +261,16 @@ where
 
     let position = display.bounding_box().top_left;
 
-    let mut drawn_day = false;
-
     let end_hour = start_display_hour + get_display_hours();
     let row_padding = calculate_row_padding(start_display_hour, end_hour);
     let y_step = text_height + row_padding;
     let mut y_offset = 0;
 
     for hour in start_display_hour..=end_hour {
-        let rel_hour = hour % 24;
         let start_pos =
             position + Point::new(text_width * HOUR_LENGTH as i32, y_offset + text_height / 2);
         let finish_pos =
             position + Point::new(display.size().width as i32, y_offset + text_height / 2);
-
-        if rel_hour == 0 && !drawn_day {
-            use icu::locale::locale;
-            use icu_datetime::DateTimeFormatter;
-
-            let icu_date = icu_datetime::input::Date::try_new_gregorian(
-                time.year() as i32,
-                time.month() as u8,
-                time.day() as u8,
-            )
-            .unwrap();
-
-            let locale = locale!("hu-HU");
-            let formatter =
-                DateTimeFormatter::try_new(locale.into(), icu_datetime::fieldsets::YMDE::long())
-                    .unwrap();
-
-            let str = formatter.format(&icu_date).to_string();
-
-            let mut rect_start = start_pos;
-            rect_start.x = -20;
-
-            let mut rect_end = finish_pos;
-            rect_end.y += y_step;
-
-            fill_rectangle_with_diagonal(display, Rectangle::with_corners(rect_start, rect_end));
-
-            Text::with_baseline(
-                &str,
-                position + Point::new(text_width * HOUR_LENGTH as i32, y_offset + y_step / 2),
-                CHARACTER_STYLE,
-                embedded_graphics::text::Baseline::Top,
-            )
-            .draw(display)
-            .unwrap();
-
-            drawn_day = true;
-        };
 
         Line::new(start_pos, finish_pos)
             .into_styled(PrimitiveStyle::with_stroke(FOREGROUND_COLOR, 1))
@@ -320,6 +279,68 @@ where
         y_offset += y_step;
     }
     // height is at max
+}
+
+pub fn draw_day_header<D>(display: &mut D, time: &jiff::Zoned, start_display_hour: u8)
+where
+    D: DrawTarget<Color = EpdColor> + OriginDimensions,
+    D::Error: core::fmt::Debug,
+{
+    let rel_hour = start_display_hour % 24;
+    let hours_to_midnight = if rel_hour == 0 { 0 } else { 24 - rel_hour };
+
+    let display_hours = get_display_hours();
+    if hours_to_midnight > display_hours {
+        return;
+    }
+
+    const HOUR_LENGTH: u8 = 5 + 1;
+    let text_height = EVENT_FONT.character_size.height as i32;
+    let text_width = EVENT_FONT.character_size.width as i32;
+
+    let end_hour = start_display_hour + display_hours;
+    let row_padding = calculate_row_padding(start_display_hour, end_hour);
+    let y_step = text_height + row_padding;
+
+    let position = display.bounding_box().top_left;
+    let y_offset = (hours_to_midnight as i32) * y_step;
+
+    let start_pos =
+        position + Point::new(text_width * HOUR_LENGTH as i32, y_offset + text_height / 2);
+    let finish_pos = position + Point::new(display.size().width as i32, y_offset + text_height / 2);
+
+    use icu::locale::locale;
+    use icu_datetime::DateTimeFormatter;
+
+    let icu_date = icu_datetime::input::Date::try_new_gregorian(
+        time.year() as i32,
+        time.month() as u8,
+        time.day() as u8,
+    )
+    .unwrap();
+
+    let locale = locale!("hu-HU");
+    let formatter =
+        DateTimeFormatter::try_new(locale.into(), icu_datetime::fieldsets::YMDE::long()).unwrap();
+
+    let str = formatter.format(&icu_date).to_string();
+
+    let mut rect_start = start_pos;
+    rect_start.x = -20;
+
+    let mut rect_end = finish_pos;
+    rect_end.y += y_step;
+
+    fill_rectangle_with_diagonal(display, Rectangle::with_corners(rect_start, rect_end));
+
+    Text::with_baseline(
+        &str,
+        position + Point::new(text_width * HOUR_LENGTH as i32, y_offset + y_step / 2),
+        CHARACTER_STYLE,
+        embedded_graphics::text::Baseline::Top,
+    )
+    .draw(display)
+    .unwrap();
 }
 
 pub(crate) fn draw_time_ticker<D>(display: &mut D, time: &jiff::Zoned, start_display_hour: u8)
