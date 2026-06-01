@@ -2,7 +2,9 @@ use core::range::RangeInclusive;
 
 use embedded_graphics::geometry::Size;
 use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
-use embedded_graphics::prelude::{Dimensions, DrawTarget, OriginDimensions, Point};
+use embedded_graphics::prelude::{
+    Dimensions, DrawTarget, DrawTargetExt as _, OriginDimensions, Point,
+};
 use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::{
     Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, RoundedRectangle,
@@ -50,7 +52,7 @@ const fn calculate_row_padding(start_hour: u8, end_hour: u8) -> i32 {
     remaining_space / (item_count)
 }
 
-pub static DISPLAY_HOURS: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(8);
+pub static DISPLAY_HOURS: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(16);
 pub static SHOW_CURRENT_DAY_ONLY: core::sync::atomic::AtomicBool =
     core::sync::atomic::AtomicBool::new(false);
 
@@ -133,13 +135,18 @@ where
 
         let fmt_hour: heapless::String<5> = hformat!("{:0>2}:00", rel_hour).unwrap();
 
-        Text::with_baseline(
+        let text = Text::with_baseline(
             &fmt_hour,
             start_pos + Point::new(0, y_offset),
             CHARACTER_STYLE,
             embedded_graphics::text::Baseline::Top,
-        )
-        .draw(display)?;
+        );
+
+        text.bounding_box()
+            .into_styled(BORDERLESS_OVERWRITE_STYLE)
+            .draw(display)?;
+
+        text.draw(display)?;
 
         y_offset += y_step;
     }
@@ -214,41 +221,52 @@ where
 
     etext.draw(display).unwrap();
 }
-
-pub fn fill_rectangle_with_diagonal<D>(display: &mut D, rect: Rectangle)
+pub fn fill_rectangle_with_diagonal<D>(display: &mut D, rect: &mut Rectangle)
 where
     D: DrawTarget<Color = EpdColor> + OriginDimensions,
     D::Error: core::fmt::Debug,
 {
+    extend_rectangle(rect);
+
+    // Draw the background to the main display normally
     rect.into_styled(OVERWRITE_STYLE).draw(display).unwrap();
+
+    // Cache the bottom right point so we don't unwrap repeatedly
+    let bottom_right_point = rect.bottom_right().unwrap();
 
     let mut bottom_left = Point {
         x: rect.top_left.x,
-        y: rect.bottom_right().unwrap().y,
+        y: bottom_right_point.y,
     };
 
-    fn move_right(point: &mut Point) {
-        point.x += 20;
+    fn move_right(point: &mut Point, by: i32) {
+        point.x += by;
     }
 
     let mut top_point = rect.top_left;
+    // Make diagonal slant
     top_point.x += rect.size.height as i32 / 2;
+    move_right(&mut bottom_left, -5);
+    move_right(&mut top_point, -5);
+
+    let mut clipped_display = display.clipped(rect);
+
     loop {
         Line::new(bottom_left, top_point)
             .into_styled(PrimitiveStyle::with_stroke(FOREGROUND_COLOR, 1))
-            .draw(display)
+            .draw(&mut clipped_display)
             .unwrap();
 
-        if top_point.x >= rect.bottom_right().unwrap().x {
+        if bottom_left.x >= bottom_right_point.x {
             break;
         }
 
-        move_right(&mut bottom_left);
-        move_right(&mut top_point);
+        move_right(&mut bottom_left, 20);
+        move_right(&mut top_point, 20);
     }
 }
 
-pub fn draw_base_calendar<D>(display: &mut D, start_display_hour: u8, time: &jiff::Zoned)
+pub fn draw_base_calendar<D>(display: &mut D, start_display_hour: u8)
 where
     D: DrawTarget<Color = EpdColor> + OriginDimensions,
     D::Error: core::fmt::Debug,
@@ -266,7 +284,7 @@ where
     let y_step = text_height + row_padding;
     let mut y_offset = 0;
 
-    for hour in start_display_hour..=end_hour {
+    for _ in start_display_hour..=end_hour {
         let start_pos =
             position + Point::new(text_width * HOUR_LENGTH as i32, y_offset + text_height / 2);
         let finish_pos =
@@ -281,7 +299,11 @@ where
     // height is at max
 }
 
-pub fn draw_day_header<D>(display: &mut D, time: &jiff::Zoned, start_display_hour: u8)
+pub fn draw_day_header<D>(
+    display: &mut D,
+    time: &jiff::Zoned,
+    start_display_hour: u8,
+) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = EpdColor> + OriginDimensions,
     D::Error: core::fmt::Debug,
@@ -291,7 +313,7 @@ where
 
     let display_hours = get_display_hours();
     if hours_to_midnight > display_hours {
-        return;
+        return Ok(());
     }
 
     const HOUR_LENGTH: u8 = 5 + 1;
@@ -326,21 +348,27 @@ where
     let str = formatter.format(&icu_date).to_string();
 
     let mut rect_start = start_pos;
-    rect_start.x = -20;
+    rect_start.x = START_POS;
 
     let mut rect_end = finish_pos;
     rect_end.y += y_step;
 
-    fill_rectangle_with_diagonal(display, Rectangle::with_corners(rect_start, rect_end));
+    fill_rectangle_with_diagonal(display, &mut Rectangle::with_corners(rect_start, rect_end));
 
-    Text::with_baseline(
+    let text = Text::with_baseline(
         &str,
         position + Point::new(text_width * HOUR_LENGTH as i32, y_offset + y_step / 2),
         CHARACTER_STYLE,
         embedded_graphics::text::Baseline::Top,
-    )
-    .draw(display)
-    .unwrap();
+    );
+
+    text.bounding_box()
+        .into_styled(BORDERLESS_OVERWRITE_STYLE)
+        .draw(display)?;
+
+    text.draw(display)?;
+
+    Ok(())
 }
 
 pub(crate) fn draw_time_ticker<D>(display: &mut D, time: &jiff::Zoned, start_display_hour: u8)
@@ -661,7 +689,7 @@ pub mod xtensa {
 
         display.clear(BACKGROUND_COLOR);
 
-        crate::display::draw_base_calendar(display, start_display_hour, &time);
+        crate::display::draw_base_calendar(display, start_display_hour);
         crate::display::draw_time_row_header(display, start_display_hour);
         let tz = jiff::tz::TimeZone::fixed(jiff::tz::offset(2));
         let mut spaces = super::OccupiedSpaces::new();

@@ -127,9 +127,7 @@ fn main() {
 
     display.clear(display::BACKGROUND_COLOR);
 
-    display::draw_time_ticker(&mut display, &now, start_display_hour);
-    display::draw_time_row_header(&mut display, start_display_hour);
-    display::draw_base_calendar(&mut display, start_display_hour, &now);
+    display::draw_base_calendar(&mut display, start_display_hour);
     display::draw_sync_time(&mut display, &now);
     //display::draw_days(&mut display, &now.weekday(), 3);
 
@@ -154,6 +152,10 @@ fn main() {
             &mut spaces,
         );
     }
+
+    display::draw_day_header(&mut display, &now, start_display_hour);
+    display::draw_time_ticker(&mut display, &now, start_display_hour);
+    display::draw_time_row_header(&mut display, start_display_hour);
 
     display::add_footer_info(&mut display);
 

@@ -2,8 +2,10 @@
 resolver = "3"
 members = [
     "vcal-parser",
-    "display-simulator",
     "web-test"
+]
+exclude = [
+    "display-simulator"
 ]
 
 [package]
