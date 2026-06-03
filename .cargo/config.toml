@@ -9,7 +9,6 @@ rustflags = [
 runner = "espflash flash --monitor --chip esp32c6 --baud 921600 --partition-table partitions.csv"
 # runner = "probe-rs run --chip=esp32c6 --preverify --always-print-stacktrace --no-location --catch-hardfault"
 rustflags = [
-  "-C", "link-arg=-Tlinkall.x",
   # Required to obtain backtraces (e.g. when using the "esp-backtrace" crate.)
   # NOTE: May negatively impact performance of produced code
   "-C", "force-frame-pointers",

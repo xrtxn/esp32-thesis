@@ -20,7 +20,7 @@
   {
     "label": "Cargo Build (ESP32-C6)",
     "command": "cargo",
-    "args": ["build"],
+    "args": ["build", "--no-default-features", "--features", "esp32c6,defmt"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
