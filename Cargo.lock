@@ -1561,7 +1561,7 @@ dependencies = [
  "esp32",
  "esp32c2",
  "esp32c3",
- "esp32c6",
+ "esp32c6 0.22.0",
  "esp32h2",
  "esp32s2",
  "esp32s3 0.34.0",
@@ -1719,6 +1719,7 @@ dependencies = [
  "cfg-if",
  "document-features",
  "esp-metadata-generated 0.4.0",
+ "esp32c6 0.23.2",
  "esp32s3 0.35.2",
 ]
 
@@ -1901,6 +1902,15 @@ checksum = "8f5e511df672d79cd63365c92045135e01ba952b6bddd25b660baff5e1110f6b"
 dependencies = [
  "critical-section",
  "defmt 1.1.0",
+ "vcell",
+]
+
+[[package]]
+name = "esp32c6"
+version = "0.23.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c58f34ff2633968c12125efc7f4f8f101078d5d34c7cb60eab82268db20986f9"
+dependencies = [
  "vcell",
 ]
 

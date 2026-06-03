@@ -1,8 +1,8 @@
-#[cfg(target_arch = "xtensa")]
+#[cfg(not(feature = "testing"))]
 use alloc::string::String;
-#[cfg(target_arch = "xtensa")]
+#[cfg(not(feature = "testing"))]
 use alloc::vec::Vec;
-#[cfg(not(target_arch = "xtensa"))]
+#[cfg(feature = "testing")]
 use std::string::String;
 
 use picoserve::AppBuilder;
@@ -19,7 +19,7 @@ pub const MAX_ORIGIN_LEN: usize = 128;
 pub const MAX_PATH_LEN: usize = 255;
 pub const MAX_URL_LEN: usize = MAX_ORIGIN_LEN + MAX_PATH_LEN;
 
-#[cfg(target_arch = "xtensa")]
+#[cfg(not(feature = "testing"))]
 pub use xtensa::*;
 
 #[derive(thiserror::Error, picoserve::response::ErrorWithStatusCode, Debug)]
@@ -31,7 +31,7 @@ pub enum AppError {
     Storage(#[from] crate::storage::StorageError),
 }
 
-#[cfg(target_arch = "xtensa")]
+#[cfg(not(feature = "testing"))]
 static REQ_MUTEX: static_cell::StaticCell<
     embassy_sync::mutex::Mutex<
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
@@ -40,12 +40,12 @@ static REQ_MUTEX: static_cell::StaticCell<
 > = static_cell::StaticCell::new();
 
 pub struct AppProps {
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(not(feature = "testing"))]
     pub flash_storage: &'static embassy_sync::mutex::Mutex<
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
         storage::FlashStorage<'static>,
     >,
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(not(feature = "testing"))]
     pub http_client_mutex: &'static embassy_sync::mutex::Mutex<
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
         reqwless::client::HttpClient<
@@ -60,16 +60,16 @@ impl AppBuilder for AppProps {
     type PathRouter = impl picoserve::routing::PathRouter;
 
     fn build_app(self) -> picoserve::Router<Self::PathRouter> {
-        #[cfg(target_arch = "xtensa")]
+        #[cfg(not(feature = "testing"))]
         let flash = self.flash_storage;
-        #[cfg(target_arch = "xtensa")]
+        #[cfg(not(feature = "testing"))]
         let http_client_mutex = self.http_client_mutex;
 
         // Reuse existing REQ_BUFFER
-        #[cfg(target_arch = "xtensa")]
+        #[cfg(not(feature = "testing"))]
         #[allow(clippy::large_stack_frames, reason = "false positive")]
         let req_buffer = crate::networking::REQ_BUFFER.init_with(|| [0u8; 8192]);
-        #[cfg(target_arch = "xtensa")]
+        #[cfg(not(feature = "testing"))]
         #[allow(clippy::large_stack_frames, reason = "false positive")]
         let req_buffer_mutex =
             &*REQ_MUTEX.init_with(|| embassy_sync::mutex::Mutex::new(req_buffer));
@@ -85,15 +85,15 @@ impl AppBuilder for AppProps {
                         #[cfg(feature = "defmt")]
                         crate::defmt::info!("Received config change request: {:?}", resp_wifi);
 
-                        #[cfg(target_arch = "xtensa")]
+                        #[cfg(not(feature = "testing"))]
                         let mut nvs = storage::read_config(flash).await.unwrap_or_default();
-                        #[cfg(not(target_arch = "xtensa"))]
+                        #[cfg(feature = "testing")]
                         let mut nvs = storage::read_config().await.unwrap_or_default();
 
                         nvs.wifi = Some(resp_wifi);
-                        #[cfg(target_arch = "xtensa")]
+                        #[cfg(not(feature = "testing"))]
                         storage::write_config(flash, nvs).await;
-                        #[cfg(not(target_arch = "xtensa"))]
+                        #[cfg(feature = "testing")]
                         storage::write_config(nvs).await;
                     },
                 ),
@@ -102,9 +102,9 @@ impl AppBuilder for AppProps {
                 "/api/config/caldav",
                 picoserve::routing::post(
                     move |req: picoserve::extract::Json<storage::CaldavCreds>| async move {
-                        #[cfg(target_arch = "xtensa")]
+                        #[cfg(not(feature = "testing"))]
                         return save_caldav_handler(flash, req).await;
-                        #[cfg(not(target_arch = "xtensa"))]
+                        #[cfg(feature = "testing")]
                         return save_caldav_handler(req).await;
                     },
                 ),
@@ -115,21 +115,21 @@ impl AppBuilder for AppProps {
                     move |picoserve::extract::Json(resp_caldav): picoserve::extract::Json<
                         storage::DisplayConfig,
                     >| async move {
-                        #[cfg(target_arch = "xtensa")]
+                        #[cfg(not(feature = "testing"))]
                         let mut nvs = storage::read_config(flash).await.unwrap_or_default();
-                        #[cfg(not(target_arch = "xtensa"))]
+                        #[cfg(feature = "testing")]
                         let mut nvs = storage::read_config().await.unwrap_or_default();
 
-                        #[cfg(target_arch = "xtensa")]
+                        #[cfg(not(feature = "testing"))]
                         crate::display::DISPLAY_HOURS.store(
                             resp_caldav.displayed_hours,
                             core::sync::atomic::Ordering::Relaxed,
                         );
                         nvs.display = Some(resp_caldav);
 
-                        #[cfg(target_arch = "xtensa")]
+                        #[cfg(not(feature = "testing"))]
                         storage::write_config(flash, nvs).await;
-                        #[cfg(not(target_arch = "xtensa"))]
+                        #[cfg(feature = "testing")]
                         storage::write_config(nvs).await;
                     },
                 ),
@@ -144,14 +144,14 @@ impl AppBuilder for AppProps {
                     move |picoserve::extract::Json(body): picoserve::extract::Json<
                         EndpointRequest,
                     >| async move {
-                        #[cfg(target_arch = "xtensa")]
+                        #[cfg(not(feature = "testing"))]
                         return fetch_domain_endpoint(
                             http_client_mutex,
                             &body.url,
                             req_buffer_mutex,
                         )
                         .await;
-                        #[cfg(not(target_arch = "xtensa"))]
+                        #[cfg(feature = "testing")]
                         return fetch_domain_endpoint(&body.url).await;
                     },
                 ),
@@ -162,7 +162,7 @@ impl AppBuilder for AppProps {
                     move |picoserve::extract::Json(credentials): picoserve::extract::Json<
                         storage::CaldavCreds,
                     >| async move {
-                        #[cfg(target_arch = "xtensa")]
+                        #[cfg(not(feature = "testing"))]
                         {
                             return check_caldav_credentials(
                                 http_client_mutex,
@@ -172,7 +172,7 @@ impl AppBuilder for AppProps {
                             .await
                             .map_err(AppError::Network);
                         }
-                        #[cfg(not(target_arch = "xtensa"))]
+                        #[cfg(feature = "testing")]
                         return check_caldav_credentials(&credentials)
                             .await
                             .map_err(AppError::Network);
@@ -183,7 +183,7 @@ impl AppBuilder for AppProps {
             .route(
                 "/api/config/caldav/calendars",
                 picoserve::routing::get(move || async move {
-                    #[cfg(target_arch = "xtensa")]
+                    #[cfg(not(feature = "testing"))]
                     {
                         let nvs = storage::read_config(flash)
                             .await
@@ -200,7 +200,7 @@ impl AppBuilder for AppProps {
                         .await
                         .map_err(AppError::Network);
                     }
-                    #[cfg(not(target_arch = "xtensa"))]
+                    #[cfg(feature = "testing")]
                     return fetch_calendars().await.map_err(AppError::Network);
                 }),
             )
@@ -208,7 +208,7 @@ impl AppBuilder for AppProps {
 }
 
 async fn fetch_domain_endpoint(
-    #[cfg(target_arch = "xtensa")] http_client_mutex: &'static embassy_sync::mutex::Mutex<
+    #[cfg(not(feature = "testing"))] http_client_mutex: &'static embassy_sync::mutex::Mutex<
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
         reqwless::client::HttpClient<
             'static,
@@ -216,14 +216,14 @@ async fn fetch_domain_endpoint(
             embassy_net::dns::DnsSocket<'static>,
         >,
     >,
-    #[cfg(target_arch = "xtensa")] body: &str,
-    #[cfg(not(target_arch = "xtensa"))] body: &str,
-    #[cfg(target_arch = "xtensa")] req_buffer_mutex: &'static embassy_sync::mutex::Mutex<
+    #[cfg(not(feature = "testing"))] body: &str,
+    #[cfg(feature = "testing")] body: &str,
+    #[cfg(not(feature = "testing"))] req_buffer_mutex: &'static embassy_sync::mutex::Mutex<
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
         &'static mut [u8; 8192],
     >,
 ) -> Result<picoserve::response::json::Json<EndpointResponse>, picoserve::response::StatusCode> {
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(not(feature = "testing"))]
     {
         let mut buf_guard = req_buffer_mutex.lock().await;
 
@@ -238,7 +238,7 @@ async fn fetch_domain_endpoint(
             None => Err(picoserve::response::StatusCode::BAD_REQUEST),
         }
     }
-    #[cfg(not(target_arch = "xtensa"))]
+    #[cfg(feature = "testing")]
     {
         let _ = body;
         let resp: heapless::String<{ MAX_URL_LEN }> =
@@ -250,7 +250,7 @@ async fn fetch_domain_endpoint(
 }
 
 async fn fetch_calendars(
-    #[cfg(target_arch = "xtensa")] http_client_mutex: &'static embassy_sync::mutex::Mutex<
+    #[cfg(not(feature = "testing"))] http_client_mutex: &'static embassy_sync::mutex::Mutex<
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
         reqwless::client::HttpClient<
             'static,
@@ -258,14 +258,14 @@ async fn fetch_calendars(
             embassy_net::dns::DnsSocket<'static>,
         >,
     >,
-    #[cfg(target_arch = "xtensa")] body: &str,
-    #[cfg(target_arch = "xtensa")] req_buffer_mutex: &'static embassy_sync::mutex::Mutex<
+    #[cfg(not(feature = "testing"))] body: &str,
+    #[cfg(not(feature = "testing"))] req_buffer_mutex: &'static embassy_sync::mutex::Mutex<
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
         &'static mut [u8; 8192],
     >,
-    #[cfg(target_arch = "xtensa")] credentials: &storage::CaldavCreds,
+    #[cfg(not(feature = "testing"))] credentials: &storage::CaldavCreds,
 ) -> Result<picoserve::response::json::Json<Vec<CalendarData>>, crate::networking::NetworkError> {
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(not(feature = "testing"))]
     {
         let mut buf_guard = req_buffer_mutex.lock().await;
 
@@ -294,7 +294,7 @@ async fn fetch_calendars(
         .await;
         Ok(picoserve::response::json::Json(calendars))
     }
-    #[cfg(not(target_arch = "xtensa"))]
+    #[cfg(feature = "testing")]
     {
         std::thread::sleep(std::time::Duration::from_secs(2));
         Ok(picoserve::response::json::Json(vec![CalendarData::new(
@@ -305,7 +305,7 @@ async fn fetch_calendars(
 }
 
 async fn check_caldav_credentials(
-    #[cfg(target_arch = "xtensa")] http_client_mutex: &'static embassy_sync::mutex::Mutex<
+    #[cfg(not(feature = "testing"))] http_client_mutex: &'static embassy_sync::mutex::Mutex<
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
         reqwless::client::HttpClient<
             'static,
@@ -313,14 +313,14 @@ async fn check_caldav_credentials(
             embassy_net::dns::DnsSocket<'static>,
         >,
     >,
-    #[cfg(target_arch = "xtensa")] req_buffer_mutex: &'static embassy_sync::mutex::Mutex<
+    #[cfg(not(feature = "testing"))] req_buffer_mutex: &'static embassy_sync::mutex::Mutex<
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
         &'static mut [u8; 8192],
     >,
-    #[cfg(target_arch = "xtensa")] credentials: &storage::CaldavCreds,
-    #[cfg(not(target_arch = "xtensa"))] credentials: &storage::CaldavCreds,
+    #[cfg(not(feature = "testing"))] credentials: &storage::CaldavCreds,
+    #[cfg(feature = "testing")] credentials: &storage::CaldavCreds,
 ) -> Result<picoserve::response::StatusCode, crate::networking::NetworkError> {
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(not(feature = "testing"))]
     {
         let mut buf_guard = req_buffer_mutex.lock().await;
 
@@ -346,7 +346,7 @@ async fn check_caldav_credentials(
 
         Ok(picoserve::response::StatusCode::OK)
     }
-    #[cfg(not(target_arch = "xtensa"))]
+    #[cfg(feature = "testing")]
     {
         let _ = credentials;
         Ok(picoserve::response::StatusCode::OK)
@@ -386,7 +386,7 @@ async fn display_config_page_handler() -> impl picoserve::response::IntoResponse
 }
 
 async fn save_caldav_handler(
-    #[cfg(target_arch = "xtensa")] flash: &'static embassy_sync::mutex::Mutex<
+    #[cfg(not(feature = "testing"))] flash: &'static embassy_sync::mutex::Mutex<
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
         storage::FlashStorage<'static>,
     >,
@@ -408,16 +408,16 @@ async fn save_caldav_handler(
         }
     }
 
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(not(feature = "testing"))]
     let mut nvs = storage::read_config(flash).await.unwrap_or_default();
-    #[cfg(not(target_arch = "xtensa"))]
+    #[cfg(feature = "testing")]
     let mut nvs = storage::read_config().await.unwrap_or_default();
 
     nvs.caldav = Some(resp_caldav);
 
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(not(feature = "testing"))]
     storage::write_config(flash, nvs).await;
-    #[cfg(not(target_arch = "xtensa"))]
+    #[cfg(feature = "testing")]
     storage::write_config(nvs).await;
     picoserve::response::StatusCode::OK
 }
@@ -429,7 +429,7 @@ pub enum NetworkStatus {
     Network,     // The device is connected to a Wi-Fi network
 }
 
-#[cfg(target_arch = "xtensa")]
+#[cfg(not(feature = "testing"))]
 mod xtensa {
     use embassy_time::Duration;
     use static_cell::StaticCell;
@@ -451,7 +451,7 @@ mod xtensa {
     static HTTP_BUFFERS: [StaticCell<[u8; 2048]>; WEB_TASK_POOL_SIZE] =
         [const { StaticCell::new() }; WEB_TASK_POOL_SIZE];
 
-    #[cfg_attr(target_arch = "xtensa", embassy_executor::task(pool_size = WEB_TASK_POOL_SIZE))]
+    #[cfg_attr(not(feature = "testing"), embassy_executor::task(pool_size = WEB_TASK_POOL_SIZE))]
     pub async fn web_task(
         task_id: usize,
         stack: embassy_net::Stack<'static>,

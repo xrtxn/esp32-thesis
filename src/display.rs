@@ -1,20 +1,17 @@
 use core::range::RangeInclusive;
 
-use embedded_graphics::geometry::Size;
 use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
 use embedded_graphics::prelude::{
     Dimensions, DrawTarget, DrawTargetExt as _, OriginDimensions, Point,
 };
 use embedded_graphics::prelude::{Drawable, Primitive};
-use embedded_graphics::primitives::{
-    Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, RoundedRectangle,
-};
+use embedded_graphics::primitives::{Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle};
 use embedded_graphics::text::Text;
 use heapless::format as hformat;
 use weact_studio_epd::Color as EpdColor;
 
 #[cfg(feature = "defmt")]
-use crate::defmt::info;
+use crate::defmt;
 
 #[allow(dead_code)]
 pub const DISPLAY_WIDTH: u32 = 300;
@@ -650,12 +647,12 @@ where
     .unwrap();
 }
 
-#[cfg(not(target_arch = "xtensa"))]
+#[cfg(feature = "testing")]
 pub use not_xtensa::*;
-#[cfg(target_arch = "xtensa")]
+#[cfg(not(feature = "testing"))]
 pub use xtensa::*;
 
-#[cfg(target_arch = "xtensa")]
+#[cfg(not(feature = "testing"))]
 pub mod xtensa {
     use alloc::string::ToString;
 
@@ -727,7 +724,7 @@ pub mod xtensa {
     }
 }
 
-#[cfg(not(target_arch = "xtensa"))]
+#[cfg(feature = "testing")]
 pub mod not_xtensa {
     use super::*;
 

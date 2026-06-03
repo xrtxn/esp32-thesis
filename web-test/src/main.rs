@@ -1,4 +1,4 @@
-#![cfg(not(target_arch = "xtensa"))]
+#![cfg(feature = "testing")]
 #![feature(impl_trait_in_assoc_type)]
 use std::net::SocketAddr;
 

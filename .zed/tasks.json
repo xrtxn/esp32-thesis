@@ -18,6 +18,15 @@
     "tags": ["rust-build"],
   },
   {
+    "label": "Cargo Build (ESP32-C6)",
+    "command": "cargo",
+    "args": ["build"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "tags": ["rust-build"],
+  },
+  {
     "label": "Cargo Build Release (ESP32)",
     "command": "nix",
     "args": ["develop", "--command", "cargo", "build", "--release"],

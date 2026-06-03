@@ -143,7 +143,12 @@ async fn main(spawner: Spawner) {
     let mut rtc = esp_hal::rtc_cntl::Rtc::new(peripherals.LPWR);
 
     let timg0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
+    #[cfg(target_arch = "xtensa")]
     esp_rtos::start(timg0.timer0);
+    #[cfg(target_arch = "riscv32")]
+    esp_rtos::start(timg0.timer0, unsafe {
+        esp_hal::interrupt::software::SoftwareInterrupt::<0>::steal()
+    });
 
     let button = peripherals.GPIO0;
 

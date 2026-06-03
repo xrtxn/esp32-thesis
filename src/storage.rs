@@ -1,6 +1,6 @@
-#[cfg(target_arch = "xtensa")]
+#[cfg(not(feature = "testing"))]
 use alloc::{string::String, vec::Vec};
-#[cfg(not(target_arch = "xtensa"))]
+#[cfg(feature = "testing")]
 use std::{string::String, vec::Vec};
 
 #[derive(thiserror::Error, picoserve::response::ErrorWithStatusCode, Debug)]
@@ -49,12 +49,12 @@ impl Default for DisplayConfig {
     }
 }
 
-#[cfg(not(target_arch = "xtensa"))]
+#[cfg(feature = "testing")]
 pub use not_xtensa::*;
-#[cfg(target_arch = "xtensa")]
+#[cfg(not(feature = "testing"))]
 pub use xtensa::*;
 
-#[cfg(target_arch = "xtensa")]
+#[cfg(not(feature = "testing"))]
 mod xtensa {
     use embassy_embedded_hal::adapter::BlockingAsync;
     use embassy_sync::blocking_mutex::raw::NoopRawMutex;
@@ -126,7 +126,7 @@ mod xtensa {
     }
 }
 
-#[cfg(not(target_arch = "xtensa"))]
+#[cfg(feature = "testing")]
 mod not_xtensa {
     use super::*;
 

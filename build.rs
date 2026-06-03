@@ -13,29 +13,26 @@ fn main() {
     std::env::set_current_dir(&workspace_dir).expect("Failed to change directory to workspace");
 
     load_env();
-    let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
-    match target_arch.as_str() {
-        "xtensa" => {
-            // always add new git footer when files changed
-            println!("cargo:rerun-if-changed=src");
-            println!("cargo:rerun-if-changed=.git/HEAD");
-            println!("cargo:rerun-if-changed=.git/refs");
-            println!("cargo:rerun-if-changed=.git/index");
+    if std::env::var("CARGO_FEATURE_TESTING").is_ok()
+        || std::env::var("CARGO_CFG_TARGET_ARCH").unwrap() == "x86_64"
+    {
+        println!("cargo:rustc-env=GIT_SHORT=emulator");
+        println!("cargo:rustc-env=GIT_DIRTY=false");
+        build_index_html();
+        build_display_html();
+    } else {
+        // always add new git footer when files changed
+        println!("cargo:rerun-if-changed=src");
+        println!("cargo:rerun-if-changed=.git/HEAD");
+        println!("cargo:rerun-if-changed=.git/refs");
+        println!("cargo:rerun-if-changed=.git/index");
 
-            add_git_info();
-            build_index_html();
-            build_display_html();
-            linker_be_nice();
-            // make sure linkall.x is the last linker script (otherwise might cause problems with flip-link)
-            println!("cargo:rustc-link-arg=-Tlinkall.x");
-        }
-        "x86_64" => {
-            println!("cargo:rustc-env=GIT_SHORT=emulator");
-            println!("cargo:rustc-env=GIT_DIRTY=false");
-            build_index_html();
-            build_display_html();
-        }
-        _ => panic!("Unsupported target architecture: {}", target_arch),
+        add_git_info();
+        build_index_html();
+        build_display_html();
+        linker_be_nice();
+        // make sure linkall.x is the last linker script (otherwise might cause problems with flip-link)
+        println!("cargo:rustc-link-arg=-Tlinkall.x");
     }
 }
 
@@ -150,10 +147,10 @@ fn linker_be_nice() {
         std::process::exit(0);
     }
 
-    println!(
-        "cargo:rustc-link-arg=-Wl,--error-handling-script={}",
-        std::env::current_exe().unwrap().display()
-    );
+    // println!(
+    //     "cargo:rustc-link-arg=-Wl,--error-handling-script={}",
+    //     std::env::current_exe().unwrap().display()
+    // );
 }
 
 fn add_git_info() {

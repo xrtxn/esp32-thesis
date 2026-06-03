@@ -1,6 +1,10 @@
+#[cfg(feature = "esp32s3")]
+use esp_hal::rtc_cntl::sleep::Ext0WakeupSource;
+#[cfg(not(feature = "esp32s3"))]
+use esp_hal::rtc_cntl::sleep::Ext1WakeupSource;
 use esp_hal::{
     gpio::{AnyPin, Input},
-    rtc_cntl::sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel},
+    rtc_cntl::sleep::{TimerWakeupSource, WakeupLevel},
     system::{SleepSource, wakeup_cause},
 };
 
@@ -30,9 +34,23 @@ pub(crate) fn go_to_deep_sleep(rtc: &mut esp_hal::rtc_cntl::Rtc<'_>) -> ! {
         embassy_time::block_for(embassy_time::Duration::from_millis(100));
     }
 
-    let pin: AnyPin<'static> = unsafe { AnyPin::steal(0) };
-    let ext0 = Ext0WakeupSource::new(pin, WakeupLevel::Low);
-    rtc.sleep_deep(&[&timer_wakeup, &ext0]);
+    let mut pin: AnyPin<'static> = unsafe { AnyPin::steal(0) };
+
+    #[cfg(feature = "esp32s3")]
+    {
+        let ext0 = Ext0WakeupSource::new(pin, WakeupLevel::Low);
+        rtc.sleep_deep(&[&timer_wakeup, &ext0]);
+    }
+
+    #[cfg(not(feature = "esp32s3"))]
+    {
+        let mut pins = [(
+            &mut pin as &mut dyn esp_hal::gpio::RtcPinWithResistors,
+            WakeupLevel::Low,
+        )];
+        let ext1 = Ext1WakeupSource::new(&mut pins);
+        rtc.sleep_deep(&[&timer_wakeup, &ext1]);
+    }
 }
 
 pub(crate) fn get_time(rtc: &esp_hal::rtc_cntl::Rtc<'_>) -> jiff::Zoned {
@@ -44,8 +62,14 @@ pub(crate) fn get_time(rtc: &esp_hal::rtc_cntl::Rtc<'_>) -> jiff::Zoned {
 pub(crate) fn apply_wakeup_boot_type() {
     match wakeup_cause() {
         // GPIO0 button was pressed
+        #[cfg(feature = "esp32s3")]
         SleepSource::Ext0 => {
             crate::defmt::info!("Woke up from GPIO0, setting boot type to Config");
+            BootType::set(BootType::Config);
+        }
+        #[cfg(not(feature = "esp32s3"))]
+        SleepSource::Ext1 => {
+            crate::defmt::info!("Woke up from GPIO, setting boot type to Config");
             BootType::set(BootType::Config);
         }
         // Timer expired
