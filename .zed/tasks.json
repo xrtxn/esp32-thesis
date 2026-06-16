@@ -9,7 +9,7 @@
     "tags": ["rust-check"],
   },
   {
-    "label": "Cargo Build (ESP32)",
+    "label": "Cargo Build (ESP32-S3)",
     "command": "nix",
     "args": ["develop", "--command", "cargo", "build"],
     "cwd": "$ZED_WORKTREE_ROOT",
@@ -19,8 +19,16 @@
   },
   {
     "label": "Cargo Build (ESP32-C6)",
-    "command": "cargo",
-    "args": ["build", "--no-default-features", "--features", "esp32c6,defmt"],
+    "command": "nix",
+    "args": [
+      "develop",
+      "--command",
+      "cargo",
+      "build",
+      "--no-default-features",
+      "--features",
+      "esp32c6,defmt",
+    ],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,

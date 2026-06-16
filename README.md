@@ -9,11 +9,21 @@ Used certificates:
 
 |BUSY|RES|D/C|CS|SCL|SDA|GND|VCC|
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|BUSY|RST|D/C|SCLK|SCL|SDA|GND|VCC|
 |15|4|18|10|12|11|X|X|
 |Purple|Orange|White|Blue|Green|Yellow|Black|Red|
 
 - LED - 48
 - LED simple - 41
+
+## My device (Esp32-c6) config
+
+|BUSY|RES|D/C|CS|SCL|SDA|GND|VCC|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|BUSY|RST|D/C|SCLK|SCL|MOSI|GND|VCC|
+|D1|D2|D3|D8|D5|D4|X|X|
+|1|2|3|19|23|22|X|X|
+|Purple|Orange|White|Blue|Green|Yellow|Black|Red|
 
 ## Esp32-s3 dev board memory layout
 

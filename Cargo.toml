@@ -142,7 +142,7 @@ opt-level = 3
 opt-level = 3
 
 [features]
-default = ["defmt", "esp32s3"]
+default = ["defmt", "esp32c6"]
 testing = []
 esp32s3 = [
     "esp-hal/esp32s3",

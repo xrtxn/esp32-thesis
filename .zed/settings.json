@@ -12,7 +12,7 @@
         },
         "cargo": {
           "allTargets": false,
-          "target": "xtensa-esp32s3-none-elf",
+          "target": "riscv32imac-unknown-none-elf",
           "buildScripts": {
             "useRustcWrapper": false,
           },

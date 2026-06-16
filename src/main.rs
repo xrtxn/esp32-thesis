@@ -19,6 +19,7 @@ mod init;
 mod networking;
 mod parsing;
 mod server;
+mod shims;
 mod storage;
 mod wifi;
 
@@ -52,6 +53,10 @@ extern crate alloc;
 const NETWORK_FAIL_LIMIT: u8 = 3;
 
 #[esp_hal::ram(unstable(rtc_fast, persistent))]
+static PERSISTENT_MAGIC: AtomicU32 = AtomicU32::new(0);
+const MAGIC_VALUE: u32 = 0xABCD1234;
+
+#[esp_hal::ram(unstable(rtc_fast, persistent))]
 static DISPLAY_SLEEP_COUNT: AtomicU32 = AtomicU32::new(0);
 
 #[esp_hal::ram(unstable(rtc_fast, persistent))]
@@ -59,6 +64,19 @@ pub static BOOT_TYPES: AtomicU8 = AtomicU8::new(BootType::Display as u8);
 
 #[esp_hal::ram(unstable(rtc_fast, persistent))]
 pub static NETWORK_FAIL_COUNT: AtomicU8 = AtomicU8::new(0);
+
+fn initialize_persistent_variables() {
+    if PERSISTENT_MAGIC.load(core::sync::atomic::Ordering::Relaxed) != MAGIC_VALUE {
+        DISPLAY_SLEEP_COUNT.store(0, core::sync::atomic::Ordering::Relaxed);
+        BOOT_TYPES.store(
+            BootType::Display as u8,
+            core::sync::atomic::Ordering::Relaxed,
+        );
+        NETWORK_FAIL_COUNT.store(0, core::sync::atomic::Ordering::Relaxed);
+        crate::networking::INITIAL_NTP_SYNC.store(0, core::sync::atomic::Ordering::Relaxed);
+        PERSISTENT_MAGIC.store(MAGIC_VALUE, core::sync::atomic::Ordering::Relaxed);
+    }
+}
 
 static TLS: static_cell::StaticCell<mbedtls_rs::Tls<'static>> = static_cell::StaticCell::new();
 static HTTP_CLIENT_MUTEX: static_cell::StaticCell<
@@ -117,6 +135,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 async fn main(spawner: Spawner) {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    initialize_persistent_variables();
 
     hardware::apply_wakeup_boot_type();
 
@@ -195,13 +215,18 @@ async fn main(spawner: Spawner) {
         let config = match stored_config.clone() {
             Some(config) => config,
             _ => {
+                crate::defmt::warn!("No config found! Booting into config mode in 5 seconds...");
+                embassy_time::Timer::after(embassy_time::Duration::from_secs(5)).await;
                 BootType::set(BootType::Config);
                 crate::wifi::stop_wifi_and_reset().await
             }
         };
 
         if config.wifi.is_none() || config.caldav.is_none() {
-            crate::defmt::warn!("Missing credentials (wifi or caldav), rebooting into config mode");
+            crate::defmt::warn!(
+                "Missing credentials (wifi or caldav), rebooting into config mode in 5 seconds..."
+            );
+            embassy_time::Timer::after(embassy_time::Duration::from_secs(5)).await;
             BootType::set(BootType::Config);
             crate::wifi::stop_wifi_and_reset().await
         }
@@ -283,19 +308,19 @@ async fn main(spawner: Spawner) {
 
     crate::defmt::info!("Microcontroller initialized");
 
-    let (mut display, mut driver) = init::init_display(
-        peripherals.GPIO12,
-        peripherals.GPIO11,
-        peripherals.SPI2,
-        peripherals.GPIO18,
-        peripherals.GPIO4,
-        peripherals.GPIO15,
-        peripherals.GPIO10,
-    )
-    .await;
-
     match boot_type {
         BootType::Display => {
+            let (mut display, mut driver) = init::init_display(
+                peripherals.GPIO23,
+                peripherals.GPIO22,
+                peripherals.SPI2,
+                peripherals.GPIO3,
+                peripherals.GPIO2,
+                peripherals.GPIO1,
+                peripherals.GPIO19,
+            )
+            .await;
+
             networking::sync_time(prev_boot_count, net_stack, &mut rtc).await;
             run_display_mode(
                 &mut rtc,
@@ -309,6 +334,24 @@ async fn main(spawner: Spawner) {
             .await;
         }
         BootType::Config => {
+            crate::defmt::info!("Starting config mode tasks...");
+            run_config_mode(spawner, net_stack, flash, trng);
+            crate::defmt::info!("Web tasks spawned successfully!");
+
+            // Yield to executor briefly so the web tasks can print their startup logs
+            embassy_time::Timer::after(embassy_time::Duration::from_millis(500)).await;
+
+            let (mut display, mut driver) = init::init_display(
+                peripherals.GPIO23,
+                peripherals.GPIO22,
+                peripherals.SPI2,
+                peripherals.GPIO3,
+                peripherals.GPIO2,
+                peripherals.GPIO1,
+                peripherals.GPIO19,
+            )
+            .await;
+
             let text = if network_status == NetworkStatus::Network {
                 alloc::format!(
                     "Connected to Wi-Fi!\nSSID: {}\nIP: {}\n",
@@ -324,14 +367,13 @@ async fn main(spawner: Spawner) {
                 )
             };
 
-            join(
-                async { run_config_mode(spawner, net_stack, flash, trng) },
-                async {
-                    display::draw_config(&mut display, text.as_str());
-                    driver.full_update(&display).await.unwrap();
-                },
-            )
-            .await;
+            crate::defmt::info!("Updating display with config instructions...");
+            display::draw_config(&mut display, text.as_str());
+            driver.full_update(&display).await.unwrap();
+
+            // Keep the main task alive indefinitely in Config mode
+            crate::defmt::info!("Config mode initialized, waiting for connections...");
+            core::future::pending::<()>().await;
         }
     }
 }

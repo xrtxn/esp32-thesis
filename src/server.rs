@@ -457,6 +457,7 @@ mod xtensa {
         stack: embassy_net::Stack<'static>,
         app: &'static picoserve::AppRouter<AppProps>,
     ) -> ! {
+        crate::defmt::info!("Spawning web_task {}", task_id);
         let port = 80;
         #[allow(clippy::large_stack_frames, reason = "false positive")]
         let tcp_rx_buffer = TCP_RX_BUFFERS[task_id].init_with(|| [0; 1024]);
@@ -465,6 +466,7 @@ mod xtensa {
         #[allow(clippy::large_stack_frames, reason = "false positive")]
         let http_buffer = HTTP_BUFFERS[task_id].init_with(|| [0; 2048]);
 
+        crate::defmt::info!("Starting picoserve on port 80 for task {}", task_id);
         picoserve::Server::new(app, &CONFIG, http_buffer)
             .listen_and_serve(task_id, stack, port, tcp_rx_buffer, tcp_tx_buffer)
             .await
